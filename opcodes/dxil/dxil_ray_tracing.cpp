@@ -662,4 +662,138 @@ bool emit_ray_query_candidate_procedural_primitive_non_opaque_instruction(Conver
 	impl.add(not_op);
 	return true;
 }
+
+bool emit_hit_object_trace_ray_instruction(Converter::Impl &impl, const llvm::CallInst *inst)
+{
+	if (emit_nvapi_trace_ray(impl, inst))
+		return true;
+
+	auto &builder = impl.builder();
+
+	builder.addExtension("SPV_EXT_shader_invocation_reorder");
+	builder.addCapability(spv::CapabilityShaderInvocationReorderEXT);
+
+	spv::Id acceleration_structure = impl.get_id_for_value(inst->getOperand(1));
+	spv::Id ray_flags = impl.get_id_for_value(inst->getOperand(2));
+	spv::Id instance_inclusion_mask = impl.get_id_for_value(inst->getOperand(3));
+	spv::Id ray_contribution_to_hit_group = impl.get_id_for_value(inst->getOperand(4));
+	spv::Id multiplier_for_geometry = impl.get_id_for_value(inst->getOperand(5));
+	spv::Id miss_shader_index = impl.get_id_for_value(inst->getOperand(6));
+
+	spv::Id ray_origin[3];
+	spv::Id ray_dir[3];
+
+	for (unsigned i = 0; i < 3; i++)
+	{
+		ray_origin[i] = impl.get_id_for_value(inst->getOperand(7 + i));
+		ray_dir[i] = impl.get_id_for_value(inst->getOperand(11 + i));
+	}
+
+	spv::Id tmin = impl.get_id_for_value(inst->getOperand(10));
+	spv::Id tmax = impl.get_id_for_value(inst->getOperand(14));
+
+	spv::Id ray_origin_vec = impl.build_vector(builder.makeFloatType(32), ray_origin, 3);
+	spv::Id ray_dir_vec = impl.build_vector(builder.makeFloatType(32), ray_dir, 3);
+
+	auto *ray_payload = inst->getOperand(15);
+
+	bool needs_temp_copy = impl.get_needs_temp_storage_copy(ray_payload);
+	spv::Id ray_payload_var_id = needs_temp_copy
+		? emit_temp_storage_copy(impl, ray_payload, spv::StorageClassRayPayloadKHR)
+		: impl.get_id_for_value(ray_payload);
+
+
+	spv::Id hit_object = impl.create_variable(spv::StorageClassFunction, builder.makeHitObjectType());
+
+	auto *op = impl.allocate(spv::OpHitObjectTraceRayEXT);
+	op->add_ids({
+	    hit_object,
+	    acceleration_structure,
+	    ray_flags,
+	    instance_inclusion_mask,
+	    ray_contribution_to_hit_group,
+	    multiplier_for_geometry,
+	    miss_shader_index,
+	    ray_origin_vec,
+	    tmin,
+	    ray_dir_vec,
+	    tmax,
+	    ray_payload_var_id
+	});
+	impl.add(op);
+
+	// In this instance, the ray_payload_var_id is our temp.
+	if (needs_temp_copy)
+		emit_temp_storage_resolve(impl, ray_payload, ray_payload_var_id);
+
+	impl.rewrite_value(inst, hit_object);
+
+	return true;
+}
+
+bool emit_hit_object_make_nop_instruction(Converter::Impl &impl, const llvm::CallInst *inst)
+{
+	auto &builder = impl.builder();
+
+	builder.addExtension("SPV_EXT_shader_invocation_reorder");
+	builder.addCapability(spv::CapabilityShaderInvocationReorderEXT);
+
+	spv::Id hit_object = impl.create_variable(spv::StorageClassFunction, builder.makeHitObjectType());
+
+	auto *op = impl.allocate(spv::OpHitObjectRecordEmptyEXT);
+	op->add_id(hit_object);
+	impl.add(op);
+
+	impl.rewrite_value(inst, hit_object);
+
+	return true;
+}
+
+bool emit_hit_object_invoke_instruction(Converter::Impl &impl, const llvm::CallInst *inst)
+{
+	auto &builder = impl.builder();
+
+	builder.addExtension("SPV_EXT_shader_invocation_reorder");
+	builder.addCapability(spv::CapabilityShaderInvocationReorderEXT);
+
+	spv::Id hit_object = impl.get_id_for_value(inst->getOperand(1));
+	auto *ray_payload = inst->getOperand(2);
+
+	bool needs_temp_copy = impl.get_needs_temp_storage_copy(ray_payload);
+	spv::Id ray_payload_var_id = needs_temp_copy
+		? emit_temp_storage_copy(impl, ray_payload, spv::StorageClassRayPayloadKHR)
+		: impl.get_id_for_value(ray_payload);
+
+	auto *op = impl.allocate(spv::OpHitObjectExecuteShaderEXT);
+	op->add_ids({
+	    hit_object,
+	    ray_payload_var_id
+	});
+	impl.add(op);
+
+	return true;
+}
+
+bool emit_maybe_reoder_thread_instruction(Converter::Impl &impl, const llvm::CallInst *inst)
+{
+	auto &builder = impl.builder();
+
+	builder.addExtension("SPV_EXT_shader_invocation_reorder");
+	builder.addCapability(spv::CapabilityShaderInvocationReorderEXT);
+
+	spv::Id hit_object = impl.get_id_for_value(inst->getOperand(1));
+	spv::Id hint = impl.get_id_for_value(inst->getOperand(2));
+	spv::Id bits = impl.get_id_for_value(inst->getOperand(3));
+
+	auto *op = impl.allocate(spv::OpReorderThreadWithHitObjectEXT);
+	op->add_ids({
+		hit_object,
+		hint,
+		bits
+	});
+	impl.add(op);
+
+	return true;
+}
+
 }
