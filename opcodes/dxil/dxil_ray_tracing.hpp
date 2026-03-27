@@ -97,6 +97,7 @@ inline bool emit_ray_query_get_matrix_value_instruction(Converter::Impl &impl, c
 }
 
 bool emit_hit_object_trace_ray_instruction(Converter::Impl &impl, const llvm::CallInst *instruction);
+bool emit_hit_object_make_miss_instruction(Converter::Impl &impl, const llvm::CallInst *instruction);
 bool emit_hit_object_make_nop_instruction(Converter::Impl &impl, const llvm::CallInst *instruction);
 bool emit_hit_object_invoke_instruction(Converter::Impl &impl, const llvm::CallInst *instruction);
 bool emit_maybe_reoder_thread_instruction(Converter::Impl &impl, const llvm::CallInst *instruction);
