@@ -337,6 +337,8 @@ struct DXILDispatcher
 		OP(HitObject_ShaderTableIndex) =
 			emit_hit_object_get_value_instruction<spv::OpHitObjectGetShaderBindingTableRecordIndexEXT, 3>;
 
+		OP(HitObject_Attributes) = emit_hit_object_attributes_instruction;
+
 		// Ray query
 		OP(AllocateRayQuery) = emit_allocate_ray_query;
 		OP(AllocateRayQuery2) = emit_allocate_ray_query; // These are compatible.
