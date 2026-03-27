@@ -293,6 +293,7 @@ struct DXILDispatcher
 		OP(IgnoreHit) = emit_ray_tracing_ignore_hit;
 		OP(CallShader) = emit_ray_tracing_call_shader;
 		OP(HitObject_TraceRay) = emit_hit_object_trace_ray_instruction;
+		OP(HitObject_MakeMiss) = emit_hit_object_make_miss_instruction;
 		OP(HitObject_MakeNop) = emit_hit_object_make_nop_instruction;
 		OP(HitObject_Invoke) = emit_hit_object_invoke_instruction;
 		OP(MaybeReorderThread) = emit_maybe_reoder_thread_instruction;
