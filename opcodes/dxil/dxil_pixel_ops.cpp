@@ -218,9 +218,9 @@ bool emit_derivative_instruction(spv::Op opcode, Converter::Impl &impl, const ll
 	spv::Id input_id;
 
 	// SPIR-V only supports 32-bit derivatives.
-	bool fp32 = instruction->getType()->getTypeID() == llvm::Type::TypeID::FloatTyID;
+	bool fp32 = instruction->getType()->getScalarType()->getTypeID() == llvm::Type::TypeID::FloatTyID;
 
-	if (instruction->getType()->getTypeID() == llvm::Type::TypeID::HalfTyID &&
+	if (instruction->getType()->getScalarType()->getTypeID() == llvm::Type::TypeID::HalfTyID &&
 	    !impl.support_native_fp16_operations())
 	{
 		fp32 = true;
@@ -237,13 +237,16 @@ bool emit_derivative_instruction(spv::Op opcode, Converter::Impl &impl, const ll
 	}
 	else
 	{
-		spv::Id fp32_type = builder.makeFloatType(32);
-		auto *cast_op = impl.allocate(spv::OpFConvert, fp32_type);
+		spv::Id convert_type = builder.makeFloatType(32);
+		if (instruction->getType()->getTypeID() == llvm::Type::TypeID::VectorTyID)
+			convert_type = builder.makeVectorType(convert_type, instruction->getType()->getVectorNumElements());
+
+		auto *cast_op = impl.allocate(spv::OpFConvert, convert_type);
 		cast_op->add_id(impl.get_id_for_value(instruction->getOperand(1)));
 		impl.add(cast_op);
 		input_id = cast_op->id;
 
-		op = impl.allocate(opcode, fp32_type);
+		op = impl.allocate(opcode, convert_type);
 	}
 
 	op->add_id(input_id);
