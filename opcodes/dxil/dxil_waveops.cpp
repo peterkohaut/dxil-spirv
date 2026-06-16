@@ -686,27 +686,27 @@ static spv::Id build_mask_reduction_input_arith(Converter::Impl &impl, const llv
 } while(0)
 
 	spv::Id replacement_value;
-	if (instruction->getType()->getTypeID() == llvm::Type::TypeID::FloatTyID)
+	if (instruction->getType()->getScalarType()->getTypeID() == llvm::Type::TypeID::FloatTyID)
 	{
 		DECLARE_TYPE_TEMPLATE(Float,
 		                      1.0f, 0.0f,
 		                      std::numeric_limits<float>::infinity(),
 		                      -std::numeric_limits<float>::infinity());
 	}
-	else if (instruction->getType()->getTypeID() == llvm::Type::TypeID::DoubleTyID)
+	else if (instruction->getType()->getScalarType()->getTypeID() == llvm::Type::TypeID::DoubleTyID)
 	{
 		DECLARE_TYPE_TEMPLATE(Double,
 		                      1.0, 0.0,
 		                      std::numeric_limits<double>::infinity(),
 		                      -std::numeric_limits<double>::infinity());
 	}
-	else if (instruction->getType()->getTypeID() == llvm::Type::TypeID::HalfTyID)
+	else if (instruction->getType()->getScalarType()->getTypeID() == llvm::Type::TypeID::HalfTyID)
 	{
 		DECLARE_TYPE_TEMPLATE(Float16, 0x3c00, 0, 0x7c00, 0xfc00);
 	}
 	else if (static_cast<DXIL::SignedOpKind>(sign_kind) == DXIL::SignedOpKind::Signed)
 	{
-		switch (instruction->getOperand(1)->getType()->getIntegerBitWidth())
+		switch (instruction->getOperand(1)->getType()->getScalarType()->getIntegerBitWidth())
 		{
 		case 16:
 			DECLARE_TYPE_TEMPLATE(Uint16, 1, 0,
@@ -732,7 +732,7 @@ static spv::Id build_mask_reduction_input_arith(Converter::Impl &impl, const llv
 	}
 	else
 	{
-		switch (instruction->getOperand(1)->getType()->getIntegerBitWidth())
+		switch (instruction->getOperand(1)->getType()->getScalarType()->getIntegerBitWidth())
 		{
 		case 16:
 			DECLARE_TYPE_TEMPLATE(Uint16, 1, 0,
@@ -755,6 +755,13 @@ static spv::Id build_mask_reduction_input_arith(Converter::Impl &impl, const llv
 		default:
 			return 0;
 		}
+	}
+
+	if (instruction->getType()->getTypeID() == llvm::Type::TypeID::VectorTyID)
+	{
+		spv::Id scalar_type_id = impl.get_type_id(instruction->getType()->getScalarType());
+		unsigned count = instruction->getType()->getVectorNumElements();
+		replacement_value = impl.build_splat_constant_vector(scalar_type_id, replacement_value, count);
 	}
 
 	auto *replace_op = impl.allocate(spv::OpSelect, impl.get_type_id(instruction->getOperand(1)->getType()));
