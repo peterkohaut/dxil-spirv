@@ -1,0 +1,135 @@
+; SPIR-V
+; Version: 1.6
+; Generator: Unknown(30017); 21022
+; Bound: 79
+; Schema: 0
+OpCapability Shader
+OpCapability RuntimeDescriptorArray
+OpCapability StorageBufferArrayNonUniformIndexing
+OpCapability PhysicalStorageBufferAddresses
+OpCapability LongVectorEXT
+OpExtension "SPV_EXT_descriptor_indexing"
+OpExtension "SPV_EXT_long_vector"
+OpExtension "SPV_KHR_physical_storage_buffer"
+OpMemoryModel PhysicalStorageBuffer64 GLSL450
+OpEntryPoint GLCompute %3 "main" %8 %14 %19 %22
+OpExecutionMode %3 LocalSize 1 1 1
+OpName %3 "main"
+OpName %6 "RootConstants"
+OpName %8 "registers"
+OpName %11 "SSBO"
+OpName %16 "SSBO"
+OpName %40 "ByteAddressMask"
+OpName %38 "index"
+OpName %39 "stride"
+OpDecorate %6 Block
+OpMemberDecorate %6 0 Offset 0
+OpMemberDecorate %6 1 Offset 4
+OpMemberDecorate %6 2 Offset 8
+OpMemberDecorate %6 3 Offset 12
+OpMemberDecorate %6 4 Offset 16
+OpMemberDecorate %6 5 Offset 20
+OpMemberDecorate %6 6 Offset 24
+OpMemberDecorate %6 7 Offset 28
+OpDecorate %10 ArrayStride 64
+OpMemberDecorate %11 0 Offset 0
+OpDecorate %11 Block
+OpDecorate %14 DescriptorSet 0
+OpDecorate %14 Binding 0
+OpDecorate %14 NonWritable
+OpDecorate %14 Restrict
+OpDecorate %15 ArrayStride 64
+OpMemberDecorate %16 0 Offset 0
+OpDecorate %16 Block
+OpDecorate %19 DescriptorSet 0
+OpDecorate %19 Binding 0
+OpDecorate %22 BuiltIn GlobalInvocationId
+OpDecorate %29 NonUniform
+OpDecorate %31 NonUniform
+OpDecorate %32 NonUniform
+OpDecorate %34 NonUniform
+OpDecorate %49 NonUniform
+OpDecorate %76 NonUniform
+%1 = OpTypeVoid
+%2 = OpTypeFunction %1
+%5 = OpTypeInt 32 0
+%6 = OpTypeStruct %5 %5 %5 %5 %5 %5 %5 %5
+%7 = OpTypePointer PushConstant %6
+%8 = OpVariable %7 PushConstant
+%9 = OpTypeVector %5 16
+%10 = OpTypeRuntimeArray %9
+%11 = OpTypeStruct %10
+%12 = OpTypeRuntimeArray %11
+%13 = OpTypePointer StorageBuffer %12
+%14 = OpVariable %13 StorageBuffer
+%15 = OpTypeRuntimeArray %9
+%16 = OpTypeStruct %15
+%17 = OpTypeRuntimeArray %16
+%18 = OpTypePointer StorageBuffer %17
+%19 = OpVariable %18 StorageBuffer
+%20 = OpTypeVector %5 3
+%21 = OpTypePointer Input %20
+%22 = OpVariable %21 Input
+%23 = OpTypePointer Input %5
+%25 = OpConstant %5 0
+%28 = OpConstant %5 1
+%30 = OpTypePointer StorageBuffer %11
+%33 = OpTypePointer StorageBuffer %16
+%36 = OpConstant %5 6
+%37 = OpTypeFunction %5 %5 %5
+%43 = OpConstant %5 4294967295
+%47 = OpConstant %5 64
+%48 = OpTypePointer StorageBuffer %9
+%51 = OpTypeFloat 32
+%52 = OpTypeVector %51 16
+%55 = OpConstant %51 1
+%56 = OpConstantComposite %52 %55 %55 %55 %55 %55 %55 %55 %55 %55 %55 %55 %55 %55 %55 %55 %55
+%3 = OpFunction %1 None %2
+%4 = OpLabel
+OpBranch %77
+%77 = OpLabel
+%24 = OpAccessChain %23 %22 %25
+%26 = OpLoad %5 %24
+%27 = OpAccessChain %23 %22 %28
+%29 = OpLoad %5 %27
+%31 = OpAccessChain %30 %14 %29
+%32 = OpIAdd %5 %29 %28
+%34 = OpAccessChain %33 %19 %32
+%35 = OpShiftLeftLogical %5 %26 %36
+%46 = OpFunctionCall %5 %40 %26 %47
+%49 = OpAccessChain %48 %31 %25 %46
+%50 = OpLoad %9 %49
+%53 = OpBitcast %52 %50
+%54 = OpFAdd %52 %53 %56
+%57 = OpFunctionCall %5 %40 %26 %47
+%58 = OpBitcast %9 %54
+%59 = OpCompositeExtract %5 %58 0
+%60 = OpCompositeExtract %5 %58 1
+%61 = OpCompositeExtract %5 %58 2
+%62 = OpCompositeExtract %5 %58 3
+%63 = OpCompositeExtract %5 %58 4
+%64 = OpCompositeExtract %5 %58 5
+%65 = OpCompositeExtract %5 %58 6
+%66 = OpCompositeExtract %5 %58 7
+%67 = OpCompositeExtract %5 %58 8
+%68 = OpCompositeExtract %5 %58 9
+%69 = OpCompositeExtract %5 %58 10
+%70 = OpCompositeExtract %5 %58 11
+%71 = OpCompositeExtract %5 %58 12
+%72 = OpCompositeExtract %5 %58 13
+%73 = OpCompositeExtract %5 %58 14
+%74 = OpCompositeExtract %5 %58 15
+%75 = OpCompositeConstruct %9 %59 %60 %61 %62 %63 %64 %65 %66 %67 %68 %69 %70 %71 %72 %73 %74
+%76 = OpAccessChain %48 %34 %25 %57
+OpStore %76 %75
+OpReturn
+OpFunctionEnd
+%40 = OpFunction %5 None %37
+%38 = OpFunctionParameter %5
+%39 = OpFunctionParameter %5
+%41 = OpLabel
+%42 = OpUDiv %5 %43 %39
+%44 = OpBitwiseAnd %5 %38 %42
+OpReturnValue %44
+OpFunctionEnd
+

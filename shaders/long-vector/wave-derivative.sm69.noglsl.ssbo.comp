@@ -1,0 +1,30 @@
+StructuredBuffer<vector<float, 7> > Input : register(t0);
+RWStructuredBuffer<vector<float, 7> > Output : register(u0);
+StructuredBuffer<vector<uint, 7> > UintInput : register(t1);
+RWStructuredBuffer<vector<uint, 7> > UintOutput : register(u1);
+
+[numthreads(4, 1, 1)]
+void main(uint3 tid : SV_DispatchThreadID)
+{
+	vector<float, 7> value = Input[tid.x];
+	bool all_positive = all(value > (vector<float, 7>)0.0);
+	bool any_nan = any(isnan(value));
+
+	vector<float, 7> result = ddx(value) + ddy(value);
+	result += WaveReadLaneAt(value, tid.x & 3);
+	result += WaveReadLaneFirst(value);
+	result += WaveActiveSum(value);
+	result += WavePrefixSum(value);
+	result += QuadReadAcrossX(value);
+	result = select(WaveActiveAllEqual(value), result, value);
+
+	if (all_positive && !any_nan)
+		Output[tid.x] = result;
+
+	vector<uint, 7> uint_value = UintInput[tid.x];
+	vector<uint, 7> uint_result = WaveActiveBitAnd(uint_value);
+	uint_result ^= WaveActiveBitOr(uint_value);
+	uint_result ^= WaveActiveBitXor(uint_value);
+	uint_result += WaveActiveMin(uint_value) + WaveActiveMax(uint_value);
+	UintOutput[tid.x] = uint_result;
+}

@@ -1,0 +1,8 @@
+StructuredBuffer<vector<float, 7> > Input : register(t0);
+RWStructuredBuffer<vector<float, 7> > Output : register(u0);
+
+[numthreads(1, 1, 1)]
+void main(uint index : SV_DispatchThreadID)
+{
+	Output[index] = Input[index] + 1;
+}

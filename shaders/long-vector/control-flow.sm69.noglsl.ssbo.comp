@@ -1,0 +1,62 @@
+ByteAddressBuffer Input : register(t0);
+RWByteAddressBuffer Output : register(u0);
+
+void accumulate(inout vector<float, 7> acc, vector<float, 7> v, uint iterations)
+{
+	[loop]
+	for (uint i = 0; i < iterations; i++)
+		acc += v * float(i);
+}
+
+vector<float, 7> clamp_or_zero(vector<float, 7> v)
+{
+	if (any(v < (vector<float, 7>)0.0))
+		return (vector<float, 7>)0.0;
+	return v;
+}
+
+[numthreads(1, 1, 1)]
+void main(uint index : SV_DispatchThreadID)
+{
+	uint offset = index * 28;
+	vector<float, 7> a = Input.Load<vector<float, 7> >(offset);
+	vector<float, 7> b = Input.Load<vector<float, 7> >(offset + 28);
+
+	vector<float, 7> acc = (vector<float, 7>)0.0;
+	accumulate(acc, a, index & 3);
+	accumulate(acc, b, (index + 1) & 3);
+
+	acc = clamp_or_zero(acc);
+
+	uint lane_selector = index % 7;
+	switch (lane_selector)
+	{
+	case 0:
+		acc[0] += 1.0;
+		break;
+	case 1:
+	case 2:
+		acc[1] += 2.0;
+		break;
+	default:
+		acc[lane_selector] += 3.0;
+		break;
+	}
+
+	bool converged = false;
+	[loop]
+	for (uint iter = 0; iter < 8 && !converged; iter++)
+	{
+		acc = acc * 0.5 + a * 0.5;
+		if (all(abs(acc - a) < (vector<float, 7>)0.01))
+		{
+			converged = true;
+			break;
+		}
+	}
+
+	if (converged)
+		Output.Store<vector<float, 7> >(offset, acc);
+	else
+		Output.Store<vector<float, 7> >(offset, -acc);
+}

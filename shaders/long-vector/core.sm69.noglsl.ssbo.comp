@@ -1,0 +1,31 @@
+ByteAddressBuffer Input : register(t0);
+RWByteAddressBuffer Output : register(u0);
+
+vector<float, 16> process(vector<float, 16> a, vector<float, 16> b, uint index)
+{
+	vector<float, 16> splat = 2.0;
+	vector<float, 16> initialized = {
+		1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0,
+		9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0
+	};
+	vector<bool, 16> condition = a < b;
+	vector<float, 16> result = select(condition, a + b, a * splat);
+	[loop]
+	for (uint i = 0; i < (index & 3); i++)
+		result += b;
+	result[index] = result[index] + initialized[index];
+	result = saturate(result);
+	vector<float, 7> middle = {
+		result[3], result[4], result[5], result[6], result[7], result[8], result[9]
+	};
+	result[0] += dot(middle, middle);
+	return result;
+}
+
+[numthreads(1, 1, 1)]
+void main(uint index : SV_DispatchThreadID)
+{
+	vector<float, 16> a = Input.Load<vector<float, 16> >(index * 128);
+	vector<float, 16> b = Input.Load<vector<float, 16> >(index * 128 + 64);
+	Output.Store<vector<float, 16> >(index * 64, process(a, b, index & 15));
+}

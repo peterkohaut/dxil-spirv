@@ -1,0 +1,93 @@
+; SPIR-V
+; Version: 1.6
+; Generator: Unknown(30017); 21022
+; Bound: 58
+; Schema: 0
+OpCapability Shader
+OpCapability PhysicalStorageBufferAddresses
+OpCapability LongVectorEXT
+OpExtension "SPV_EXT_long_vector"
+OpExtension "SPV_KHR_physical_storage_buffer"
+OpMemoryModel PhysicalStorageBuffer64 GLSL450
+OpEntryPoint GLCompute %3 "main" %9 %12
+OpExecutionMode %3 LocalSize 1 1 1
+OpName %3 "main"
+OpName %7 "RootConstants"
+OpName %9 "registers"
+OpName %24 "PhysicalPointerUint7NonWrite"
+OpMemberName %24 0 "value"
+OpName %28 "AddCarry"
+OpName %45 "PhysicalPointerUint7"
+OpMemberName %45 0 "value"
+OpDecorate %7 Block
+OpMemberDecorate %7 0 Offset 0
+OpMemberDecorate %7 1 Offset 8
+OpMemberDecorate %7 2 Offset 16
+OpMemberDecorate %7 3 Offset 24
+OpDecorate %12 BuiltIn GlobalInvocationId
+OpMemberDecorate %24 0 Offset 0
+OpDecorate %24 Block
+OpMemberDecorate %24 0 NonWritable
+OpMemberDecorate %45 0 Offset 0
+OpDecorate %45 Block
+%1 = OpTypeVoid
+%2 = OpTypeFunction %1
+%5 = OpTypeInt 32 0
+%6 = OpTypeVector %5 2
+%7 = OpTypeStruct %6 %6 %6 %6
+%8 = OpTypePointer PushConstant %7
+%9 = OpVariable %8 PushConstant
+%10 = OpTypeVector %5 3
+%11 = OpTypePointer Input %10
+%12 = OpVariable %11 Input
+%13 = OpTypePointer Input %5
+%15 = OpConstant %5 0
+%18 = OpConstant %5 28
+%19 = OpTypePointer PushConstant %6
+%21 = OpConstant %5 1
+%23 = OpTypeVector %5 7
+%24 = OpTypeStruct %23
+%25 = OpTypePointer PhysicalStorageBuffer %24
+%28 = OpTypeStruct %5 %5
+%35 = OpTypePointer PhysicalStorageBuffer %23
+%43 = OpConstant %5 2
+%45 = OpTypeStruct %23
+%46 = OpTypePointer PhysicalStorageBuffer %45
+%3 = OpFunction %1 None %2
+%4 = OpLabel
+%39 = OpUndef %23
+OpBranch %56
+%56 = OpLabel
+%14 = OpAccessChain %13 %12 %15
+%16 = OpLoad %5 %14
+%17 = OpIMul %5 %16 %18
+%20 = OpAccessChain %19 %9 %21
+%22 = OpLoad %6 %20
+%26 = OpCompositeExtract %5 %22 0
+%27 = OpCompositeExtract %5 %22 1
+%29 = OpIAddCarry %28 %26 %17
+%30 = OpCompositeExtract %5 %29 0
+%31 = OpCompositeExtract %5 %29 1
+%32 = OpIAdd %5 %27 %31
+%33 = OpCompositeConstruct %6 %30 %32
+%34 = OpBitcast %25 %33
+%36 = OpInBoundsAccessChain %35 %34 %15
+%37 = OpLoad %23 %36 Aligned 4
+%38 = OpCompositeInsert %23 %16 %39 0
+%40 = OpVectorShuffle %23 %38 %39 0 0 0 0 0 0 0
+%41 = OpBitwiseXor %23 %40 %37
+%42 = OpAccessChain %19 %9 %43
+%44 = OpLoad %6 %42
+%47 = OpCompositeExtract %5 %44 0
+%48 = OpCompositeExtract %5 %44 1
+%49 = OpIAddCarry %28 %47 %17
+%50 = OpCompositeExtract %5 %49 0
+%51 = OpCompositeExtract %5 %49 1
+%52 = OpIAdd %5 %48 %51
+%53 = OpCompositeConstruct %6 %50 %52
+%54 = OpBitcast %46 %53
+%55 = OpInBoundsAccessChain %35 %54 %15
+OpStore %55 %41 Aligned 4
+OpReturn
+OpFunctionEnd
+

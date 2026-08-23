@@ -1,0 +1,35 @@
+ByteAddressBuffer Input : register(t0);
+RWByteAddressBuffer Output : register(u0);
+
+[numthreads(4, 1, 1)]
+void main(uint index : SV_DispatchThreadID)
+{
+	vector<uint, 7> value = Input.Load<vector<uint, 7> >(index * 28);
+
+	uint lane = index % 7;
+	uint lane_offset = lane * 4;
+
+	uint old_add;
+	Output.InterlockedAdd(lane_offset, value[lane], old_add);
+
+	uint old_max;
+	Output.InterlockedMax(lane_offset + 28, value[lane], old_max);
+
+	uint old_min;
+	Output.InterlockedMin(lane_offset + 56, value[lane], old_min);
+
+	uint old_and;
+	Output.InterlockedAnd(lane_offset + 84, value[lane], old_and);
+
+	uint old_or;
+	Output.InterlockedOr(lane_offset + 112, value[lane], old_or);
+
+	uint old_xor;
+	Output.InterlockedXor(lane_offset + 140, value[lane], old_xor);
+
+	uint old_exch;
+	Output.InterlockedExchange(lane_offset + 168, value[lane], old_exch);
+
+	uint old_cmp;
+	Output.InterlockedCompareExchange(lane_offset + 196, old_exch, value[lane], old_cmp);
+}

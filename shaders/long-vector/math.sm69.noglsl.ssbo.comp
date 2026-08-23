@@ -1,0 +1,38 @@
+ByteAddressBuffer Input : register(t0);
+RWByteAddressBuffer Output : register(u0);
+
+[numthreads(1, 1, 1)]
+void main(uint index : SV_DispatchThreadID)
+{
+	uint foffset = index * 28;
+	vector<float, 7> a = Input.Load<vector<float, 7> >(foffset);
+	vector<float, 7> b = Input.Load<vector<float, 7> >(foffset + 28);
+
+	vector<float, 7> result = min(a, b);
+	result = max(result, a * 0.5);
+	result = clamp(result, -1.0, 1.0);
+	result = lerp(result, b, 0.25);
+	result = mad(result, 2.0, a);
+	result += frac(a) + floor(b) + ceil(a) + round(b) + trunc(a);
+	result += sign(a) * abs(b);
+	result += rcp(abs(a) + 1.0);
+	result += exp2(frac(a)) + log2(abs(b) + 1.0);
+	result += sin(a) + cos(b);
+	result += pow(abs(a) + 1.0, 2.0);
+	result = select(a < b, result, -result);
+
+	Output.Store<vector<float, 7> >(foffset, result);
+
+	uint uoffset = index * 28;
+	vector<uint, 7> ua = Input.Load<vector<uint, 7> >(uoffset);
+	vector<uint, 7> ub = Input.Load<vector<uint, 7> >(uoffset + 28);
+
+	vector<uint, 7> uresult = (ua & ub) | (ua ^ ub);
+	uresult = ~uresult;
+	uresult += (ua << 1) ^ (ub >> 2);
+	uresult += countbits(ua) + reversebits(ub);
+	uresult += firstbithigh(ua) + firstbitlow(ub);
+	uresult = select(ua >= ub, uresult, ua);
+
+	Output.Store<vector<uint, 7> >(uoffset + 4096, uresult);
+}

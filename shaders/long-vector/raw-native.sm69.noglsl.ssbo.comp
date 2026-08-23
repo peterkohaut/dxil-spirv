@@ -1,0 +1,10 @@
+ByteAddressBuffer Input : register(t0);
+RWByteAddressBuffer Output : register(u0);
+
+[numthreads(1, 1, 1)]
+void main(uint index : SV_DispatchThreadID)
+{
+	uint offset = index * 28;
+	vector<float, 7> value = Input.Load<vector<float, 7> >(offset);
+	Output.Store<vector<float, 7> >(offset, value + 1);
+}

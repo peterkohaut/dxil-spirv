@@ -1,0 +1,46 @@
+struct Payload
+{
+	vector<uint16_t, 7> u16_7;
+	vector<int16_t, 16> i16_16;
+	vector<float16_t, 7> f16_7;
+	vector<uint, 16> u32_16;
+	vector<int, 7> i32_7;
+	vector<uint64_t, 16> u64_16;
+	vector<int64_t, 7> i64_7;
+	vector<double, 16> f64_16;
+	float4x4 f32_4x4;
+};
+
+StructuredBuffer<Payload> Input : register(t0);
+RWStructuredBuffer<Payload> Output : register(u0);
+
+groupshared vector<uint, 16> Shared;
+static vector<int, 7> Private[2];
+
+[numthreads(2, 1, 1)]
+void main(uint3 tid : SV_DispatchThreadID, uint group_index : SV_GroupIndex)
+{
+	Payload value = Input[tid.x];
+
+	vector<float, 16> local_values[2];
+	local_values[0] = (vector<float, 16>)value.u32_16;
+	local_values[1] = local_values[0] + 1.0;
+	Shared = asuint(local_values[group_index & 1]);
+	GroupMemoryBarrierWithGroupSync();
+	value.u32_16 = Shared;
+
+	if (tid.x & 1)
+		Private[tid.x & 1] = value.i32_7;
+	else
+		Private[tid.x & 1] = -value.i32_7;
+	value.i32_7 = Private[(tid.x + 1) & 1];
+
+	value.u16_7 += (vector<uint16_t, 7>)1;
+	value.i16_16 = -value.i16_16;
+	value.f16_7 = sqrt(abs(value.f16_7));
+	value.u64_16 += (vector<uint64_t, 16>)1;
+	value.i64_7 -= (vector<int64_t, 7>)1;
+	value.f64_16 = value.f64_16 * 2.0 + 1.0;
+	value.f32_4x4 *= 2.0;
+	Output[tid.x] = value;
+}

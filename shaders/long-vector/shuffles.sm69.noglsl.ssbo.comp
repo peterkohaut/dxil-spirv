@@ -1,0 +1,20 @@
+ByteAddressBuffer Input : register(t0);
+RWByteAddressBuffer Output : register(u0);
+
+[numthreads(1, 1, 1)]
+void main(uint index : SV_DispatchThreadID)
+{
+	uint offset = index * 64;
+	vector<float, 7> a = Input.Load<vector<float, 7> >(offset);
+	vector<float, 7> b = Input.Load<vector<float, 7> >(offset + 28);
+
+	vector<float, 16> wide = { a, b, a[0], b[0] };
+
+	vector<float, 7> narrow = (vector<float, 7>)wide;
+
+	vector<float, 16> mixed = { narrow, b, a[1], b[1] };
+
+	Output.Store<vector<float, 16> >(offset, wide);
+	Output.Store<vector<float, 7> >(offset + 4096, narrow);
+	Output.Store<vector<float, 16> >(offset + 8192, mixed);
+}

@@ -1,0 +1,9 @@
+ByteAddressBuffer Input : register(t0);
+RWByteAddressBuffer Output : register(u0);
+
+[numthreads(1, 1, 1)]
+void main(uint index : SV_DispatchThreadID)
+{
+	vector<uint, 7> value = Input.Load<vector<uint, 7> >(index * 28);
+	Output.Store<vector<uint, 7> >(index * 28, value ^ (vector<uint, 7>)index);
+}

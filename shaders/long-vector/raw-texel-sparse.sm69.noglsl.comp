@@ -1,0 +1,12 @@
+ByteAddressBuffer Input : register(t0);
+RWByteAddressBuffer Output : register(u0);
+
+[numthreads(1, 1, 1)]
+void main(uint index : SV_DispatchThreadID)
+{
+	uint status;
+	vector<float, 16> value =
+		Input.Load<vector<float, 16> >(index * 64, status);
+	if (CheckAccessFullyMapped(status))
+		Output.Store<vector<float, 16> >(index * 64, value);
+}

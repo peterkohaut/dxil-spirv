@@ -1,0 +1,170 @@
+// HeuristicWaveSize(32)
+; SPIR-V
+; Version: 1.6
+; Generator: Unknown(30017); 21022
+; Bound: 110
+; Schema: 0
+OpCapability Shader
+OpCapability DerivativeControl
+OpCapability GroupNonUniformVote
+OpCapability GroupNonUniformArithmetic
+OpCapability GroupNonUniformBallot
+OpCapability GroupNonUniformShuffle
+OpCapability GroupNonUniformQuad
+OpCapability ComputeDerivativeGroupLinearKHR
+OpCapability LongVectorEXT
+OpExtension "SPV_EXT_long_vector"
+OpExtension "SPV_KHR_compute_shader_derivatives"
+OpMemoryModel Logical GLSL450
+OpEntryPoint GLCompute %3 "main" %10 %14 %18 %22 %25
+OpExecutionMode %3 DerivativeGroupLinearKHR
+OpExecutionMode %3 LocalSize 4 1 1
+OpName %3 "main"
+OpName %8 "SSBO"
+OpName %12 "SSBO"
+OpName %16 "SSBO"
+OpName %20 "SSBO"
+OpDecorate %7 ArrayStride 28
+OpMemberDecorate %8 0 Offset 0
+OpDecorate %8 Block
+OpDecorate %10 DescriptorSet 0
+OpDecorate %10 Binding 0
+OpDecorate %10 NonWritable
+OpDecorate %10 Restrict
+OpDecorate %11 ArrayStride 28
+OpMemberDecorate %12 0 Offset 0
+OpDecorate %12 Block
+OpDecorate %14 DescriptorSet 0
+OpDecorate %14 Binding 1
+OpDecorate %14 NonWritable
+OpDecorate %14 Restrict
+OpDecorate %15 ArrayStride 28
+OpMemberDecorate %16 0 Offset 0
+OpDecorate %16 Block
+OpDecorate %18 DescriptorSet 0
+OpDecorate %18 Binding 0
+OpDecorate %18 NonReadable
+OpDecorate %19 ArrayStride 28
+OpMemberDecorate %20 0 Offset 0
+OpDecorate %20 Block
+OpDecorate %22 DescriptorSet 0
+OpDecorate %22 Binding 1
+OpDecorate %22 NonReadable
+OpDecorate %25 BuiltIn GlobalInvocationId
+%1 = OpTypeVoid
+%2 = OpTypeFunction %1
+%5 = OpTypeInt 32 0
+%6 = OpTypeVector %5 7
+%7 = OpTypeRuntimeArray %6
+%8 = OpTypeStruct %7
+%9 = OpTypePointer StorageBuffer %8
+%10 = OpVariable %9 StorageBuffer
+%11 = OpTypeRuntimeArray %6
+%12 = OpTypeStruct %11
+%13 = OpTypePointer StorageBuffer %12
+%14 = OpVariable %13 StorageBuffer
+%15 = OpTypeRuntimeArray %6
+%16 = OpTypeStruct %15
+%17 = OpTypePointer StorageBuffer %16
+%18 = OpVariable %17 StorageBuffer
+%19 = OpTypeRuntimeArray %6
+%20 = OpTypeStruct %19
+%21 = OpTypePointer StorageBuffer %20
+%22 = OpVariable %21 StorageBuffer
+%23 = OpTypeVector %5 3
+%24 = OpTypePointer Input %23
+%25 = OpVariable %24 Input
+%26 = OpTypePointer Input %5
+%28 = OpConstant %5 0
+%30 = OpTypePointer StorageBuffer %6
+%33 = OpTypeFloat 32
+%34 = OpTypeVector %33 7
+%36 = OpTypeBool
+%37 = OpTypeVector %36 7
+%39 = OpConstantNull %34
+%44 = OpConstant %5 3
+%3 = OpFunction %1 None %2
+%4 = OpLabel
+OpBranch %106
+%106 = OpLabel
+%27 = OpAccessChain %26 %25 %28
+%29 = OpLoad %5 %27
+%31 = OpAccessChain %30 %10 %28 %29
+%32 = OpLoad %6 %31
+%35 = OpBitcast %34 %32
+%38 = OpFOrdGreaterThan %37 %35 %39
+%40 = OpAll %36 %38
+%41 = OpIsNan %37 %35
+%42 = OpAny %36 %41
+%43 = OpBitwiseAnd %5 %29 %44
+%45 = OpGroupNonUniformShuffle %34 %44 %35 %43
+%46 = OpGroupNonUniformBroadcastFirst %34 %44 %35
+%47 = OpGroupNonUniformFAdd %34 %44 Reduce %35
+%48 = OpGroupNonUniformFAdd %34 %44 ExclusiveScan %35
+%49 = OpGroupNonUniformQuadSwap %34 %44 %35 %28
+%51 = OpCompositeExtract %33 %35 0
+%52 = OpGroupNonUniformAllEqual %36 %44 %51
+%53 = OpCompositeExtract %33 %35 1
+%54 = OpGroupNonUniformAllEqual %36 %44 %53
+%55 = OpCompositeExtract %33 %35 2
+%56 = OpGroupNonUniformAllEqual %36 %44 %55
+%57 = OpCompositeExtract %33 %35 3
+%58 = OpGroupNonUniformAllEqual %36 %44 %57
+%59 = OpCompositeExtract %33 %35 4
+%60 = OpGroupNonUniformAllEqual %36 %44 %59
+%61 = OpCompositeExtract %33 %35 5
+%62 = OpGroupNonUniformAllEqual %36 %44 %61
+%63 = OpCompositeExtract %33 %35 6
+%64 = OpGroupNonUniformAllEqual %36 %44 %63
+%50 = OpCompositeConstruct %37 %52 %54 %56 %58 %60 %62 %64
+%65 = OpLogicalNot %36 %40
+%66 = OpLogicalOr %36 %42 %65
+OpSelectionMerge %108 None
+OpBranchConditional %66 %108 %107
+%107 = OpLabel
+%87 = OpDPdxCoarse %34 %35
+%88 = OpDPdyCoarse %34 %35
+%89 = OpFAdd %34 %46 %45
+%90 = OpFAdd %34 %89 %47
+%91 = OpFAdd %34 %90 %48
+%92 = OpFAdd %34 %91 %49
+%93 = OpFAdd %34 %92 %87
+%94 = OpFAdd %34 %93 %88
+%95 = OpSelect %34 %50 %94 %35
+%96 = OpBitcast %6 %95
+%97 = OpCompositeExtract %5 %96 0
+%98 = OpCompositeExtract %5 %96 1
+%99 = OpCompositeExtract %5 %96 2
+%100 = OpCompositeExtract %5 %96 3
+%101 = OpCompositeExtract %5 %96 4
+%102 = OpCompositeExtract %5 %96 5
+%103 = OpCompositeExtract %5 %96 6
+%104 = OpCompositeConstruct %6 %97 %98 %99 %100 %101 %102 %103
+%105 = OpAccessChain %30 %18 %28 %29
+OpStore %105 %104
+OpBranch %108
+%108 = OpLabel
+%67 = OpAccessChain %30 %14 %28 %29
+%68 = OpLoad %6 %67
+%69 = OpGroupNonUniformBitwiseAnd %6 %44 Reduce %68
+%70 = OpGroupNonUniformBitwiseOr %6 %44 Reduce %68
+%71 = OpBitwiseXor %6 %69 %70
+%72 = OpGroupNonUniformBitwiseXor %6 %44 Reduce %68
+%73 = OpBitwiseXor %6 %71 %72
+%74 = OpGroupNonUniformUMin %6 %44 Reduce %68
+%75 = OpGroupNonUniformUMax %6 %44 Reduce %68
+%76 = OpIAdd %6 %73 %74
+%77 = OpIAdd %6 %76 %75
+%78 = OpCompositeExtract %5 %77 0
+%79 = OpCompositeExtract %5 %77 1
+%80 = OpCompositeExtract %5 %77 2
+%81 = OpCompositeExtract %5 %77 3
+%82 = OpCompositeExtract %5 %77 4
+%83 = OpCompositeExtract %5 %77 5
+%84 = OpCompositeExtract %5 %77 6
+%85 = OpCompositeConstruct %6 %78 %79 %80 %81 %82 %83 %84
+%86 = OpAccessChain %30 %22 %28 %29
+OpStore %86 %85
+OpReturn
+OpFunctionEnd
+

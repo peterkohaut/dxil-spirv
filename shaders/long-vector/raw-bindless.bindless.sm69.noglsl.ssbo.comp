@@ -1,0 +1,11 @@
+[numthreads(1, 1, 1)]
+void main(uint3 tid : SV_DispatchThreadID)
+{
+	ByteAddressBuffer input =
+		ResourceDescriptorHeap[NonUniformResourceIndex(tid.y)];
+	RWByteAddressBuffer output =
+		ResourceDescriptorHeap[NonUniformResourceIndex(tid.y + 1)];
+	vector<float, 16> value =
+		input.Load<vector<float, 16> >(tid.x * 64);
+	output.Store<vector<float, 16> >(tid.x * 64, value + 1.0);
+}

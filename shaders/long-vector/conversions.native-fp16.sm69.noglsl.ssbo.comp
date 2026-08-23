@@ -1,0 +1,39 @@
+ByteAddressBuffer Input : register(t0);
+RWByteAddressBuffer Output : register(u0);
+
+[numthreads(1, 1, 1)]
+void main(uint index : SV_DispatchThreadID)
+{
+	uint offset = index * 28;
+
+	vector<int, 7> src_i = Input.Load<vector<int, 7> >(offset);
+	vector<uint, 7> src_u = Input.Load<vector<uint, 7> >(offset);
+	vector<float, 7> src_f = Input.Load<vector<float, 7> >(offset);
+
+	vector<uint16_t, 7> narrow_u16 = (vector<uint16_t, 7>)src_u;
+	vector<int16_t, 7> narrow_i16 = (vector<int16_t, 7>)src_i;
+	vector<uint64_t, 7> wide_u64 = (vector<uint64_t, 7>)src_u;
+	vector<int64_t, 7> wide_i64 = (vector<int64_t, 7>)src_i;
+
+	vector<uint, 7> result_u = (vector<uint, 7>)narrow_u16;
+	result_u += (vector<uint, 7>)wide_u64;
+	vector<int, 7> result_i = (vector<int, 7>)narrow_i16;
+	result_i += (vector<int, 7>)wide_i64;
+
+	vector<float, 7> f_from_i = (vector<float, 7>)src_i;
+	vector<float, 7> f_from_u = (vector<float, 7>)src_u;
+	vector<int, 7> i_from_f = (vector<int, 7>)src_f;
+	vector<uint, 7> u_from_f = (vector<uint, 7>)src_f;
+	vector<double, 7> d_from_f = (vector<double, 7>)src_f;
+	vector<float, 7> f_from_d = (vector<float, 7>)d_from_f;
+	vector<half, 7> h_from_f = (vector<half, 7>)src_f;
+	vector<float, 7> f_from_h = (vector<float, 7>)h_from_f;
+
+	vector<uint, 7> bits_from_f = asuint(src_f);
+	vector<float, 7> f_from_bits = asfloat(bits_from_f);
+	vector<int, 7> bits_from_f_signed = asint(src_f);
+
+	Output.Store<vector<uint, 7> >(offset, result_u + u_from_f + bits_from_f);
+	Output.Store<vector<int, 7> >(offset + 4096, result_i + i_from_f + bits_from_f_signed);
+	Output.Store<vector<float, 7> >(offset + 8192, f_from_i + f_from_u + f_from_d + f_from_h + f_from_bits);
+}

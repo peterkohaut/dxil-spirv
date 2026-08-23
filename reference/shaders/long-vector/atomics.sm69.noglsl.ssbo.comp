@@ -1,0 +1,134 @@
+; SPIR-V
+; Version: 1.6
+; Generator: Unknown(30017); 21022
+; Bound: 100
+; Schema: 0
+OpCapability Shader
+OpCapability LongVectorEXT
+OpExtension "SPV_EXT_long_vector"
+OpMemoryModel Logical GLSL450
+OpEntryPoint GLCompute %3 "main" %10 %14 %17
+OpExecutionMode %3 LocalSize 4 1 1
+OpName %3 "main"
+OpName %8 "SSBO"
+OpName %12 "SSBO"
+OpName %40 "ByteAddressMask"
+OpName %38 "index"
+OpName %39 "stride"
+OpDecorate %7 ArrayStride 28
+OpMemberDecorate %8 0 Offset 0
+OpDecorate %8 Block
+OpDecorate %10 DescriptorSet 0
+OpDecorate %10 Binding 0
+OpDecorate %10 NonWritable
+OpDecorate %10 Restrict
+OpDecorate %11 ArrayStride 4
+OpMemberDecorate %12 0 Offset 0
+OpDecorate %12 Block
+OpDecorate %14 DescriptorSet 0
+OpDecorate %14 Binding 0
+OpDecorate %17 BuiltIn GlobalInvocationId
+%1 = OpTypeVoid
+%2 = OpTypeFunction %1
+%5 = OpTypeInt 32 0
+%6 = OpTypeVector %5 7
+%7 = OpTypeRuntimeArray %6
+%8 = OpTypeStruct %7
+%9 = OpTypePointer StorageBuffer %8
+%10 = OpVariable %9 StorageBuffer
+%11 = OpTypeRuntimeArray %5
+%12 = OpTypeStruct %11
+%13 = OpTypePointer StorageBuffer %12
+%14 = OpVariable %13 StorageBuffer
+%15 = OpTypeVector %5 3
+%16 = OpTypePointer Input %15
+%17 = OpVariable %16 Input
+%18 = OpTypePointer Input %5
+%20 = OpConstant %5 0
+%22 = OpTypePointer Function %6
+%25 = OpConstant %5 28
+%27 = OpTypePointer StorageBuffer %6
+%31 = OpConstant %5 7
+%33 = OpConstant %5 2
+%34 = OpTypePointer Function %5
+%37 = OpTypeFunction %5 %5 %5
+%43 = OpConstant %5 4294967295
+%47 = OpConstant %5 4
+%48 = OpTypePointer StorageBuffer %5
+%51 = OpConstant %5 1
+%58 = OpConstant %5 56
+%60 = OpConstant %5 14
+%65 = OpConstant %5 84
+%67 = OpConstant %5 21
+%72 = OpConstant %5 112
+%78 = OpConstant %5 140
+%80 = OpConstant %5 35
+%85 = OpConstant %5 168
+%87 = OpConstant %5 42
+%92 = OpConstant %5 196
+%94 = OpConstant %5 49
+%3 = OpFunction %1 None %2
+%4 = OpLabel
+%23 = OpVariable %22 Function
+OpBranch %98
+%98 = OpLabel
+%19 = OpAccessChain %18 %17 %20
+%21 = OpLoad %5 %19
+%24 = OpIMul %5 %21 %25
+%26 = OpUDiv %5 %24 %25
+%28 = OpAccessChain %27 %10 %20 %26
+%29 = OpLoad %6 %28
+OpStore %23 %29
+%30 = OpUMod %5 %21 %31
+%32 = OpShiftLeftLogical %5 %30 %33
+%35 = OpAccessChain %34 %23 %30
+%36 = OpLoad %5 %35
+%46 = OpFunctionCall %5 %40 %30 %47
+%49 = OpAccessChain %48 %14 %20 %46
+%50 = OpAtomicIAdd %5 %49 %51 %20 %36
+%52 = OpIAdd %5 %32 %25
+%53 = OpIAdd %5 %30 %31
+%54 = OpFunctionCall %5 %40 %53 %47
+%55 = OpAccessChain %48 %14 %20 %54
+%56 = OpAtomicUMax %5 %55 %51 %20 %36
+%57 = OpIAdd %5 %32 %58
+%59 = OpIAdd %5 %30 %60
+%61 = OpFunctionCall %5 %40 %59 %47
+%62 = OpAccessChain %48 %14 %20 %61
+%63 = OpAtomicUMin %5 %62 %51 %20 %36
+%64 = OpIAdd %5 %32 %65
+%66 = OpIAdd %5 %30 %67
+%68 = OpFunctionCall %5 %40 %66 %47
+%69 = OpAccessChain %48 %14 %20 %68
+%70 = OpAtomicAnd %5 %69 %51 %20 %36
+%71 = OpIAdd %5 %32 %72
+%73 = OpIAdd %5 %30 %25
+%74 = OpFunctionCall %5 %40 %73 %47
+%75 = OpAccessChain %48 %14 %20 %74
+%76 = OpAtomicOr %5 %75 %51 %20 %36
+%77 = OpIAdd %5 %32 %78
+%79 = OpIAdd %5 %30 %80
+%81 = OpFunctionCall %5 %40 %79 %47
+%82 = OpAccessChain %48 %14 %20 %81
+%83 = OpAtomicXor %5 %82 %51 %20 %36
+%84 = OpIAdd %5 %32 %85
+%86 = OpIAdd %5 %30 %87
+%88 = OpFunctionCall %5 %40 %86 %47
+%89 = OpAccessChain %48 %14 %20 %88
+%90 = OpAtomicExchange %5 %89 %51 %20 %36
+%91 = OpIAdd %5 %32 %92
+%93 = OpIAdd %5 %30 %94
+%95 = OpFunctionCall %5 %40 %93 %47
+%96 = OpAccessChain %48 %14 %20 %95
+%97 = OpAtomicCompareExchange %5 %96 %51 %20 %20 %36 %90
+OpReturn
+OpFunctionEnd
+%40 = OpFunction %5 None %37
+%38 = OpFunctionParameter %5
+%39 = OpFunctionParameter %5
+%41 = OpLabel
+%42 = OpUDiv %5 %43 %39
+%44 = OpBitwiseAnd %5 %38 %42
+OpReturnValue %44
+OpFunctionEnd
+

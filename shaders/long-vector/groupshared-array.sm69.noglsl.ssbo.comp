@@ -1,0 +1,25 @@
+StructuredBuffer<vector<float, 7> > Input : register(t0);
+RWStructuredBuffer<vector<float, 7> > Output : register(u0);
+
+groupshared vector<float, 7> Shared[4];
+
+[numthreads(4, 1, 1)]
+void main(uint3 tid : SV_DispatchThreadID, uint group_index : SV_GroupIndex)
+{
+	Shared[group_index] = Input[tid.x];
+	GroupMemoryBarrierWithGroupSync();
+
+	vector<float, 7> neighbor = Shared[(group_index + 1) & 3];
+	vector<float, 7> result = Shared[group_index] + neighbor;
+
+	GroupMemoryBarrierWithGroupSync();
+	Shared[group_index] = result;
+	GroupMemoryBarrierWithGroupSync();
+
+	vector<float, 7> total = (vector<float, 7>)0.0;
+	[unroll]
+	for (uint i = 0; i < 4; i++)
+		total += Shared[i];
+
+	Output[tid.x] = total;
+}
