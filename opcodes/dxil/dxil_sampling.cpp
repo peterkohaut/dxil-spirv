@@ -1965,6 +1965,23 @@ bool emit_check_access_fully_mapped_instruction(Converter::Impl &impl, const llv
 {
 	auto &builder = impl.builder();
 	builder.addCapability(spv::CapabilitySparseResidency);
+
+	if (const auto *extract = llvm::dyn_cast<llvm::ExtractValueInst>(instruction->getOperand(1)))
+	{
+		auto residency_itr = impl.long_vector_sparse_residency.find(extract->getAggregateOperand());
+		if (residency_itr != impl.long_vector_sparse_residency.end())
+		{
+			if (extract->getNumIndices() != 1 || extract->getIndices()[0] != 1)
+			{
+				LOGE("Long vector sparse feedback must be consumed through its feedback value.\n");
+				return false;
+			}
+
+			impl.rewrite_value(instruction, residency_itr->second);
+			return true;
+		}
+	}
+
 	auto *op = impl.allocate(spv::OpImageSparseTexelsResident, instruction);
 	op->add_id(impl.get_id_for_value(instruction->getOperand(1)));
 	impl.add(op);

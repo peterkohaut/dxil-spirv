@@ -173,12 +173,24 @@ void get_physical_load_store_cast_info(Converter::Impl &impl, const llvm::Type *
 	}
 }
 
-static spv::Id build_index_divider_fallback(Converter::Impl &impl, const llvm::Value *offset, unsigned addr_shift_log2)
+static spv::Id build_index_divider_fallback(Converter::Impl &impl, const llvm::Value *offset,
+                                            unsigned addr_shift_log2, unsigned vecsize)
 {
 	auto &builder = impl.builder();
-	Operation *op = impl.allocate(spv::OpShiftRightLogical, builder.makeUintType(32));
+	unsigned element_size = (1u << addr_shift_log2) * vecsize;
+	bool power_of_two = (element_size & (element_size - 1)) == 0;
+	Operation *op = impl.allocate(power_of_two ? spv::OpShiftRightLogical : spv::OpUDiv,
+	                              builder.makeUintType(32));
 	op->add_id(impl.get_id_for_value(offset));
-	op->add_id(builder.makeUintConstant(addr_shift_log2));
+	if (power_of_two)
+	{
+		unsigned shift = 0;
+		for (unsigned size = element_size; size > 1; size >>= 1)
+			shift++;
+		op->add_id(builder.makeUintConstant(shift));
+	}
+	else
+		op->add_id(builder.makeUintConstant(element_size));
 	impl.add(op);
 	return op->id;
 }
@@ -325,6 +337,10 @@ spv::Id build_index_divider(Converter::Impl &impl, const llvm::Value *offset,
                             unsigned addr_shift_log2, unsigned vecsize, bool byte_address_wrap)
 {
 	auto &builder = impl.builder();
+
+	unsigned element_size = (1u << addr_shift_log2) * vecsize;
+	if (byte_address_wrap && (element_size & (element_size - 1)) != 0)
+		return build_index_divider_fallback(impl, offset, addr_shift_log2, vecsize);
 	// Attempt to do trivial constant folding to make output a little more sensible to read.
 	// Try to find an expression for offset which is "constant0 * offset + constant1",
 	// where constant0 and constant1 are aligned with addr_shift_log2.
@@ -409,8 +425,7 @@ spv::Id build_index_divider(Converter::Impl &impl, const llvm::Value *offset,
 	{
 		// This path implicitly gets the wrapping right since it starts with the final byte address offset,
 		// and shifts down. This will always work as intended.
-		assert(vecsize == 1);
-		index_id = build_index_divider_fallback(impl, offset, addr_shift_log2);
+		index_id = build_index_divider_fallback(impl, offset, addr_shift_log2, vecsize);
 	}
 
 	return index_id;

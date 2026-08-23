@@ -313,6 +313,7 @@ struct Converter::Impl
 	UnorderedMap<const llvm::Value *, uint32_t> llvm_value_to_uav_resource_index_map;
 	UnorderedSet<const llvm::Value *> llvm_values_using_update_counter;
 	UnorderedMap<const llvm::Value *, spv::Id> llvm_value_actual_type;
+	UnorderedMap<const llvm::Value *, spv::Id> long_vector_sparse_residency;
 	UnorderedSet<uint32_t> llvm_attribute_at_vertex_indices;
 
 	AGSState ags;
