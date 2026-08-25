@@ -299,6 +299,10 @@ unsigned raw_access_byte_address_vectorize(
 	{
 		if (raw_access_byte_address_can_vectorize(impl, type, byte_offset, vecsize))
 			return vecsize;
+
+		for (unsigned chunk = 4; chunk >= 2; chunk--)
+			if (raw_access_byte_address_can_vectorize(impl, type, byte_offset, chunk))
+				return chunk;
 		return 1;
 	}
 
@@ -324,6 +328,10 @@ unsigned raw_access_structured_vectorize(
 	{
 		if (raw_access_structured_can_vectorize(impl, type, index, stride, byte_offset, vecsize))
 			return vecsize;
+
+		for (unsigned chunk = 4; chunk >= 2; chunk--)
+			if (raw_access_structured_can_vectorize(impl, type, index, stride, byte_offset, chunk))
+				return chunk;
 		return 1;
 	}
 
@@ -999,6 +1007,89 @@ static bool validate_long_vector_sparse_feedback_uses(Converter::Impl &impl,
 	return true;
 }
 
+static spv::Id emit_ssbo_chunked_raw_load(
+	Converter::Impl &impl, const llvm::CallInst *instruction,
+	const Converter::Impl::ResourceMeta &meta,
+	spv::Id image_id, spv::Id scalar_image_id, const llvm::Type *element_type,
+	const BufferAccessInfo &access, spv::Id extracted_id_type, spv::Id accessed_id_type,
+	unsigned conservative_num_elements, bool vectorized_load, bool long_vector,
+	uint32_t access_mask)
+{
+	auto &builder = impl.builder();
+	unsigned vecsize = access.raw_vec_size;
+
+	spv::Id ptr_type = builder.makePointer(spv::StorageClassStorageBuffer, accessed_id_type);
+	unsigned full_chunks = vectorized_load ? conservative_num_elements / vecsize : 0;
+	unsigned chunk_loads = vectorized_load ? full_chunks : conservative_num_elements;
+	Vector<spv::Id> component_ids(conservative_num_elements);
+
+	for (unsigned i = 0; i < chunk_loads; i++)
+	{
+		if (vectorized_load || long_vector || (access_mask & (1u << i)) != 0)
+		{
+			auto *chain_op = impl.allocate(spv::OpAccessChain, ptr_type);
+			chain_op->add_id(image_id);
+			chain_op->add_id(builder.makeUintConstant(0));
+			chain_op->add_id(impl.build_offset(access.index_id, i));
+			impl.add(chain_op);
+
+			if (meta.non_uniform)
+				builder.addDecoration(chain_op->id, spv::DecorationNonUniform);
+
+			auto *load_op = impl.allocate(spv::OpLoad, accessed_id_type);
+			load_op->add_id(chain_op->id);
+
+			add_vkmm_access_qualifiers(impl, load_op, meta.vkmm);
+			impl.add(load_op, meta.rov);
+			if (vectorized_load && conservative_num_elements != vecsize)
+			{
+				for (unsigned lane = 0; lane < vecsize; lane++)
+				{
+					auto *extract_op = impl.allocate(spv::OpCompositeExtract, extracted_id_type);
+					extract_op->add_id(load_op->id);
+					extract_op->add_literal(lane);
+					impl.add(extract_op);
+					component_ids[i * vecsize + lane] = extract_op->id;
+				}
+			}
+			else
+				component_ids[i] = load_op->id;
+		}
+		else
+			component_ids[i] = builder.createUndefined(extracted_id_type);
+	}
+
+	if (vectorized_load && conservative_num_elements == vecsize)
+		return component_ids[0];
+
+	if (vectorized_load && full_chunks * vecsize < conservative_num_elements)
+	{
+		auto scalar_access = build_buffer_access(
+			impl, instruction, 0, meta.index_offset_id, element_type, 1u);
+		spv::Id scalar_ptr_type = builder.makePointer(
+			spv::StorageClassStorageBuffer, extracted_id_type);
+		for (unsigned lane = full_chunks * vecsize; lane < conservative_num_elements; lane++)
+		{
+			auto *chain_op = impl.allocate(spv::OpAccessChain, scalar_ptr_type);
+			chain_op->add_id(scalar_image_id);
+			chain_op->add_id(builder.makeUintConstant(0));
+			chain_op->add_id(impl.build_offset(scalar_access.index_id, lane));
+			impl.add(chain_op);
+
+			if (meta.non_uniform)
+				builder.addDecoration(chain_op->id, spv::DecorationNonUniform);
+
+			auto *load_op = impl.allocate(spv::OpLoad, extracted_id_type);
+			load_op->add_id(chain_op->id);
+			add_vkmm_access_qualifiers(impl, load_op, meta.vkmm);
+			impl.add(load_op, meta.rov);
+			component_ids[lane] = load_op->id;
+		}
+	}
+
+	return impl.build_vector(extracted_id_type, component_ids.data(), conservative_num_elements);
+}
+
 bool emit_buffer_load_instruction(Converter::Impl &impl, const llvm::CallInst *instruction, bool is_vector)
 {
 	if (emit_ags_buffer_load(impl, instruction, DXIL::Op::BufferLoad))
@@ -1093,6 +1184,9 @@ bool emit_buffer_load_instruction(Converter::Impl &impl, const llvm::CallInst *i
 	unsigned vector_components = is_vector ? get_composite_element_count(result_type) : 0;
 	bool can_alias_long_vector = !is_typed && meta.storage == spv::StorageClassStorageBuffer &&
 	                             vector_components > 4;
+	spv::Id scalar_image_id = get_buffer_alias_handle(
+		impl, meta, image_id, raw_type, width, 1);
+
 	auto access = build_buffer_access(impl, instruction, 0, meta.index_offset_id,
 	                                  element_type,
 	                                  smeared_access_mask,
@@ -1155,55 +1249,10 @@ bool emit_buffer_load_instruction(Converter::Impl &impl, const llvm::CallInst *i
 
 		if (ssbo)
 		{
-			if (vectorized_load && conservative_num_elements == vecsize)
-			{
-				spv::Id ptr_type = builder.makePointer(spv::StorageClassStorageBuffer, accessed_id_type);
-				auto *chain_op = impl.allocate(spv::OpAccessChain, ptr_type);
-				chain_op->add_id(image_id);
-				chain_op->add_id(builder.makeUintConstant(0));
-				chain_op->add_id(impl.build_offset(access.index_id, 0));
-				impl.add(chain_op);
-
-				if (meta.non_uniform)
-					builder.addDecoration(chain_op->id, spv::DecorationNonUniform);
-
-				auto *load_op = impl.allocate(spv::OpLoad, accessed_id_type);
-				load_op->add_id(chain_op->id);
-
-				add_vkmm_access_qualifiers(impl, load_op, meta.vkmm);
-				impl.add(load_op, meta.rov);
-				constructed_id = load_op->id;
-			}
-			else
-			{
-				spv::Id scalar_ptr_type = builder.makePointer(spv::StorageClassStorageBuffer, extracted_id_type);
-
-				for (unsigned i = 0; i < conservative_num_elements; i++)
-				{
-					if (long_vector || (access_mask & (1u << i)) != 0)
-					{
-						auto *chain_op = impl.allocate(spv::OpAccessChain, scalar_ptr_type);
-						chain_op->add_id(image_id);
-						chain_op->add_id(builder.makeUintConstant(0));
-						chain_op->add_id(impl.build_offset(access.index_id, i));
-						impl.add(chain_op);
-
-						if (meta.non_uniform)
-							builder.addDecoration(chain_op->id, spv::DecorationNonUniform);
-
-						auto *load_op = impl.allocate(spv::OpLoad, extracted_id_type);
-						load_op->add_id(chain_op->id);
-
-						add_vkmm_access_qualifiers(impl, load_op, meta.vkmm);
-						impl.add(load_op, meta.rov);
-						component_ids[i] = load_op->id;
-					}
-					else
-						component_ids[i] = builder.createUndefined(extracted_id_type);
-				}
-
-				constructed_id = impl.build_vector(extracted_id_type, component_ids.data(), conservative_num_elements);
-			}
+			constructed_id = emit_ssbo_chunked_raw_load(
+				impl, instruction, meta, image_id, scalar_image_id, element_type,
+				access, extracted_id_type, accessed_id_type, conservative_num_elements,
+				vectorized_load, long_vector, access_mask);
 		}
 		else
 		{
@@ -1725,6 +1774,70 @@ static unsigned emit_buffer_store_values_bitcast(Converter::Impl &impl, const ll
 	return raw_vecsize;
 }
 
+static void emit_ssbo_chunked_raw_store(
+	Converter::Impl &impl, const llvm::CallInst *instruction,
+	const Converter::Impl::ResourceMeta &meta,
+	spv::Id image_id, spv::Id scalar_image_id, const llvm::Type *element_type,
+	const BufferAccessInfo &access, RawType raw_type, RawWidth width,
+	bool is_vector, unsigned vector_size, const spv::Id *store_values)
+{
+	auto &builder = impl.builder();
+	spv::Id elem_type_id = raw_type == RawType::Integer ?
+	                       builder.makeUintType(raw_width_to_bits(width)) :
+	                       builder.makeFloatType(raw_width_to_bits(width));
+
+	unsigned vecsize = access.raw_vec_size;
+	spv::Id vec_type_id = builder.makeVectorType(elem_type_id, vecsize);
+	unsigned component_count = is_vector ? vector_size : vecsize;
+	unsigned full_chunks = component_count / vecsize;
+	for (unsigned chunk = 0; chunk < full_chunks; chunk++)
+	{
+		spv::Id vector_value_id = impl.build_vector(
+			elem_type_id, store_values + chunk * vecsize, vecsize);
+		Operation *chain_op = impl.allocate(
+			spv::OpAccessChain, builder.makePointer(spv::StorageClassStorageBuffer, vec_type_id));
+
+		chain_op->add_id(image_id);
+		chain_op->add_id(builder.makeUintConstant(0));
+		chain_op->add_id(impl.build_offset(access.index_id, chunk));
+		impl.add(chain_op);
+
+		if (meta.non_uniform)
+			builder.addDecoration(chain_op->id, spv::DecorationNonUniform);
+
+		Operation *store_op = impl.allocate(spv::OpStore);
+		store_op->add_id(chain_op->id);
+		store_op->add_id(vector_value_id);
+		add_vkmm_access_qualifiers(impl, store_op, meta.vkmm);
+		impl.add(store_op, meta.rov);
+	}
+
+	if (full_chunks * vecsize < component_count)
+	{
+		auto scalar_access = build_buffer_access(
+			impl, instruction, 0, meta.index_offset_id, element_type, 1u);
+		spv::Id scalar_ptr_type = builder.makePointer(
+			spv::StorageClassStorageBuffer, elem_type_id);
+		for (unsigned lane = full_chunks * vecsize; lane < component_count; lane++)
+		{
+			Operation *chain_op = impl.allocate(spv::OpAccessChain, scalar_ptr_type);
+			chain_op->add_id(scalar_image_id);
+			chain_op->add_id(builder.makeUintConstant(0));
+			chain_op->add_id(impl.build_offset(scalar_access.index_id, lane));
+			impl.add(chain_op);
+
+			if (meta.non_uniform)
+				builder.addDecoration(chain_op->id, spv::DecorationNonUniform);
+
+			Operation *store_op = impl.allocate(spv::OpStore);
+			store_op->add_id(chain_op->id);
+			store_op->add_id(store_values[lane]);
+			add_vkmm_access_qualifiers(impl, store_op, meta.vkmm);
+			impl.add(store_op, meta.rov);
+		}
+	}
+}
+
 bool emit_buffer_store_instruction(Converter::Impl &impl, const llvm::CallInst *instruction, bool is_vector)
 {
 	auto &builder = impl.builder();
@@ -1793,6 +1906,9 @@ bool emit_buffer_store_instruction(Converter::Impl &impl, const llvm::CallInst *
 	                   RawType::Float : RawType::Integer;
 	bool can_alias_long_vector = !is_typed && meta.storage == spv::StorageClassStorageBuffer &&
 	                             vector_size > 4;
+	spv::Id scalar_image_id = get_buffer_alias_handle(
+		impl, meta, image_id, raw_type, width, 1);
+
 	uint32_t descriptor_store_mask = meta.storage != spv::StorageClassUniformConstant ? mask : 1u;
 
 	auto access = build_buffer_access(impl, instruction, 0, meta.index_offset_id,
@@ -1829,29 +1945,9 @@ bool emit_buffer_store_instruction(Converter::Impl &impl, const llvm::CallInst *
 	{
 		if (vectorized_store)
 		{
-			spv::Id elem_type_id = raw_type == RawType::Integer ?
-			                       builder.makeUintType(raw_width_to_bits(width)) :
-			                       builder.makeFloatType(raw_width_to_bits(width));
-
-			unsigned vecsize = access.raw_vec_size;
-			spv::Id vec_type_id = builder.makeVectorType(elem_type_id, vecsize);
-			spv::Id vector_value_id = impl.build_vector(elem_type_id, store_values.data(), vecsize);
-			Operation *chain_op = impl.allocate(
-				spv::OpAccessChain, builder.makePointer(spv::StorageClassStorageBuffer, vec_type_id));
-
-			chain_op->add_id(image_id);
-			chain_op->add_id(builder.makeUintConstant(0));
-			chain_op->add_id(impl.build_offset(access.index_id, 0));
-			impl.add(chain_op);
-
-			if (meta.non_uniform)
-				builder.addDecoration(chain_op->id, spv::DecorationNonUniform);
-
-			Operation *store_op = impl.allocate(spv::OpStore);
-			store_op->add_id(chain_op->id);
-			store_op->add_id(vector_value_id);
-			add_vkmm_access_qualifiers(impl, store_op, meta.vkmm);
-			impl.add(store_op, meta.rov);
+			emit_ssbo_chunked_raw_store(impl, instruction, meta, image_id, scalar_image_id,
+			                            element_type, access, raw_type, width,
+			                            is_vector, vector_size, store_values.data());
 		}
 		else
 		{

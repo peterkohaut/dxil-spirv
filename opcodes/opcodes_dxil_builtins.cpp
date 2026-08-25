@@ -611,6 +611,9 @@ static void update_raw_access_tracking_for_byte_address(
     {
 		auto vec = raw_access_byte_address_vectorize(impl, type, byte_offset, mask, vecsize);
 		update_raw_access_tracking(tracking, type, vec);
+
+		if (vecsize > 4 && vec > 1 && vecsize % vec != 0)
+			update_raw_access_tracking(tracking, type);
     }
 }
 
@@ -628,6 +631,9 @@ static void update_raw_access_tracking_for_structured(
     {
 		auto vec = raw_access_structured_vectorize(impl, type, index, stride, byte_offset, mask, vecsize);
 		update_raw_access_tracking(tracking, type, vec);
+
+		if (vecsize > 4 && vec > 1 && vecsize % vec != 0)
+			update_raw_access_tracking(tracking, type);
     }
 }
 
