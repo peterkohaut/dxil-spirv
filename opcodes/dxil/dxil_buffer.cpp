@@ -292,8 +292,16 @@ bool raw_access_structured_can_vectorize(
 
 unsigned raw_access_byte_address_vectorize(
 	Converter::Impl &impl, const llvm::Type *type,
-    const llvm::Value *byte_offset, uint32_t mask)
+    const llvm::Value *byte_offset, uint32_t mask,
+	unsigned vecsize)
 {
+	if (vecsize > 4)
+	{
+		if (raw_access_byte_address_can_vectorize(impl, type, byte_offset, vecsize))
+			return vecsize;
+		return 1;
+	}
+
 	if (mask == 0xfu && raw_access_byte_address_can_vectorize(impl, type, byte_offset, 4))
 		return 4;
 	else if (mask == 0x7u && raw_access_byte_address_can_vectorize(impl, type, byte_offset, 3))
@@ -309,8 +317,16 @@ unsigned raw_access_structured_vectorize(
 	const llvm::Value *index,
 	unsigned stride,
     const llvm::Value *byte_offset,
-	uint32_t mask)
+	uint32_t mask,
+	unsigned vecsize)
 {
+	if (vecsize > 4)
+	{
+		if (raw_access_structured_can_vectorize(impl, type, index, stride, byte_offset, vecsize))
+			return vecsize;
+		return 1;
+	}
+
 	if (mask == 0xfu && raw_access_structured_can_vectorize(impl, type, index, stride, byte_offset, 4))
 		return 4;
 	else if (mask == 0x7u && raw_access_structured_can_vectorize(impl, type, index, stride, byte_offset, 3))

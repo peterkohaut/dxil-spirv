@@ -594,7 +594,7 @@ static void update_raw_access_tracking(AccessTracking &tracking, const llvm::Typ
 	if (!get_raw_declaration_from_llvm_type(type, raw_type, raw_width))
 		return;
 
-	tracking.raw_access_buffer_declarations[int(raw_type)][int(raw_width)][vecsize - 1] = true;
+	tracking.add_raw_declaration(raw_type, raw_width, vecsize);
 }
 
 static void update_raw_access_tracking_for_byte_address(
@@ -602,14 +602,15 @@ static void update_raw_access_tracking_for_byte_address(
 	AccessTracking &tracking,
 	const llvm::Type *type,
 	const llvm::Value *byte_offset,
-	uint32_t mask)
+	uint32_t mask,
+	unsigned vecsize = 0)
 {
     // If we have raw access chains, we don't bother trying to vectorize the SSBOs.
     // Just emit one alias and we can go from there.
     if (!impl.options.nv_raw_access_chains)
     {
-        auto vec = raw_access_byte_address_vectorize(impl, type, byte_offset, mask);
-        update_raw_access_tracking(tracking, type, unsigned(vec) + 1);
+		auto vec = raw_access_byte_address_vectorize(impl, type, byte_offset, mask, vecsize);
+		update_raw_access_tracking(tracking, type, vec);
     }
 }
 
@@ -620,12 +621,13 @@ static void update_raw_access_tracking_for_structured(
 	const llvm::Value *index,
 	unsigned stride,
 	const llvm::Value *byte_offset,
-	uint32_t mask)
+	uint32_t mask,
+	unsigned vecsize = 0)
 {
     if (!impl.options.nv_raw_access_chains)
     {
-        auto vec = raw_access_structured_vectorize(impl, type, index, stride, byte_offset, mask);
-        update_raw_access_tracking(tracking, type, unsigned(vec) + 1);
+		auto vec = raw_access_structured_vectorize(impl, type, index, stride, byte_offset, mask, vecsize);
+		update_raw_access_tracking(tracking, type, vec);
     }
 }
 
@@ -718,7 +720,7 @@ bool analyze_alloca_cbv_forwarding_pre_resource_emit(Converter::Impl &impl, cons
 	if (cbv_tracking)
 	{
 		auto raw_type = scalar_type->isFloatingPointTy() ? RawType::Float : RawType::Integer;
-		cbv_tracking->raw_access_buffer_declarations[int(raw_type)][int(RawWidth::B32)][0] = true;
+		cbv_tracking->add_raw_declaration(raw_type, RawWidth::B32, 1);
 	}
 
 	return true;
@@ -768,7 +770,7 @@ static void analyze_dxil_cbuffer_load(Converter::Impl &impl, const llvm::CallIns
 			case 2:
 			case 4:
 				// We'll bit-cast on-demand for f16x8.
-				tracking->raw_access_buffer_declarations[int(RawType::Float)][int(RawWidth::B32)][3] = true;
+				tracking->add_raw_declaration(RawType::Float, RawWidth::B32, 4);
 				break;
 
 			case 8:
@@ -776,7 +778,7 @@ static void analyze_dxil_cbuffer_load(Converter::Impl &impl, const llvm::CallIns
 				// Need aliases here to handle difference in Float64 vs Int64 support.
 				// For 16-bit, support is gated behind both types.
 				bool is_float = get_composite_element_type(instruction->getType())->getTypeID() == llvm::Type::TypeID::DoubleTyID;
-				tracking->raw_access_buffer_declarations[int(is_float ? RawType::Float : RawType::Integer)][int(RawWidth::B64)][1] = true;
+				tracking->add_raw_declaration(is_float ? RawType::Float : RawType::Integer, RawWidth::B64, 2);
 				break;
 			}
 
@@ -789,11 +791,11 @@ static void analyze_dxil_cbuffer_load(Converter::Impl &impl, const llvm::CallIns
 			switch (get_type_scalar_alignment(impl, instruction->getType()))
 			{
 			case 2:
-				tracking->raw_access_buffer_declarations[int(RawType::Float)][int(RawWidth::B16)][0] = true;
+				tracking->add_raw_declaration(RawType::Float, RawWidth::B16, 1);
 				break;
 
 			case 4:
-				tracking->raw_access_buffer_declarations[int(RawType::Float)][int(RawWidth::B32)][0] = true;
+				tracking->add_raw_declaration(RawType::Float, RawWidth::B32, 1);
 				break;
 
 			case 8:
@@ -801,7 +803,7 @@ static void analyze_dxil_cbuffer_load(Converter::Impl &impl, const llvm::CallIns
 				// Need aliases here to handle difference in Float64 vs Int64 support.
 				// For 16-bit, support is gated behind both types.
 				bool is_float = instruction->getType()->getTypeID() == llvm::Type::TypeID::DoubleTyID;
-				tracking->raw_access_buffer_declarations[int(is_float ? RawType::Float : RawType::Integer)][int(RawWidth::B64)][0] = true;
+				tracking->add_raw_declaration(is_float ? RawType::Float : RawType::Integer, RawWidth::B64, 1);
 				break;
 			}
 
@@ -865,17 +867,17 @@ static void analyze_dxil_buffer_load(Converter::Impl &impl, const llvm::CallInst
 			auto meta = get_resource_meta_from_buffer_op(impl, instruction);
 
 			uint32_t access_mask = 0;
+			unsigned vecsize = 0;
 			auto composite_itr = impl.llvm_composite_meta.find(instruction);
 			if (composite_itr != impl.llvm_composite_meta.end())
 				access_mask = composite_itr->second.access_mask & 0xfu;
 
 			if (opcode == DXIL::Op::RawBufferVectorLoad)
 			{
-				unsigned vecsize = get_composite_element_count(instruction->getType());
+				vecsize = get_composite_element_count(instruction->getType());
 				access_mask = (1u << vecsize) - 1u;
-				// TODO: Add support for long vector.
 				if (vecsize > 4)
-					access_mask = 0xfu;
+					access_mask = 1;
 
 			}
 			else
@@ -889,7 +891,8 @@ static void analyze_dxil_buffer_load(Converter::Impl &impl, const llvm::CallInst
 			{
 				update_raw_access_tracking_for_byte_address(impl, *tracking,
 				                                            get_composite_element_type(instruction->getType()),
-				                                            instruction->getOperand(2), access_mask);
+				                                            instruction->getOperand(2), access_mask,
+				                                            vecsize);
 			}
 			else if (meta.kind == DXIL::ResourceKind::StructuredBuffer)
 			{
@@ -898,7 +901,8 @@ static void analyze_dxil_buffer_load(Converter::Impl &impl, const llvm::CallInst
 				                                          instruction->getOperand(2),
 				                                          meta.stride,
 				                                          instruction->getOperand(3),
-				                                          access_mask);
+				                                          access_mask,
+				                                          vecsize);
 			}
 		}
 	}
@@ -932,13 +936,14 @@ static void analyze_dxil_buffer_store(Converter::Impl &impl, const llvm::CallIns
 
 			const auto *type = instruction->getOperand(4)->getType();
 			uint32_t mask = 0;
+			unsigned vecsize = 0;
 
 			if (opcode == DXIL::Op::RawBufferVectorStore)
 			{
-				unsigned vecsize = type->getVectorNumElements();
+				vecsize = type->getVectorNumElements();
 				mask = (1u << vecsize) - 1u;
 				if (vecsize > 4)
-					mask = 0xfu; // TODO: long vector
+					mask = 1;
 				type = type->getVectorElementType();
 			}
 			else
@@ -949,7 +954,8 @@ static void analyze_dxil_buffer_store(Converter::Impl &impl, const llvm::CallIns
 			if (meta.kind == DXIL::ResourceKind::RawBuffer)
 			{
 				update_raw_access_tracking_for_byte_address(impl, *tracking, type,
-				                                            instruction->getOperand(2), mask);
+				                                            instruction->getOperand(2), mask,
+				                                            vecsize);
 			}
 			else if (meta.kind == DXIL::ResourceKind::StructuredBuffer)
 			{
@@ -958,7 +964,8 @@ static void analyze_dxil_buffer_store(Converter::Impl &impl, const llvm::CallIns
 				                                          instruction->getOperand(2),
 				                                          meta.stride,
 				                                          instruction->getOperand(3),
-				                                          mask);
+				                                          mask,
+				                                          vecsize);
 			}
 		}
 		impl.shader_analysis.has_side_effects = true;

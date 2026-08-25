@@ -183,7 +183,17 @@ struct AccessTracking
 	bool has_atomic_64bit = false;
 	bool has_counter = false;
 	bool dynamically_indexed_cbv = false;
-	bool raw_access_buffer_declarations[unsigned(RawType::Count)][unsigned(RawWidth::Count)][4] = {};
+
+	Vector<unsigned> raw_access_buffer_declarations[unsigned(RawType::Count)][unsigned(RawWidth::Count)];
+
+	void add_raw_declaration(RawType type, RawWidth width, unsigned vecsize)
+	{
+		auto &counts = raw_access_buffer_declarations[unsigned(type)][unsigned(width)];
+		for (unsigned c : counts)
+			if (c == vecsize)
+				return;
+		counts.push_back(vecsize);
+	}
 };
 
 struct Converter::Impl

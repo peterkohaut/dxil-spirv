@@ -1064,25 +1064,65 @@ bool Converter::Impl::analyze_aliased_access(const AccessTracking &tracking,
 			if (width == RawWidth::B16 && !execution_mode_meta.native_16bit_operations)
 				continue;
 
+			auto type = RawType(type_);
+
+			bool fold_16bit = width == RawWidth::B32 && !execution_mode_meta.native_16bit_operations;
+
+			const auto &counts = tracking.raw_access_buffer_declarations[type_][width_];
+			const auto &counts_16bit = tracking.raw_access_buffer_declarations[type_][unsigned(RawWidth::B16)];
+
+			unsigned max_vecsize = 0;
 			for (unsigned vecsize = 1; vecsize <= 4; vecsize++)
 			{
-				auto type = RawType(type_);
 				// Non-native 16-bit SSBOs are declared as 32-bit, so avoid false aliases.
-				bool has_decl = tracking.raw_access_buffer_declarations[type_][width_][vecsize - 1];
-				if (!has_decl && RawWidth(width) == RawWidth::B32 && !execution_mode_meta.native_16bit_operations)
-					has_decl = tracking.raw_access_buffer_declarations[type_][unsigned(RawWidth::B16)][vecsize - 1];
+				bool has_decl = std::find(counts.begin(), counts.end(), vecsize) != counts.end();
+				if (!has_decl && fold_16bit)
+					has_decl = std::find(counts_16bit.begin(), counts_16bit.end(), vecsize) != counts_16bit.end();
 
 				if (has_decl)
 				{
+					max_vecsize = vecsize;
 					if (width == RawWidth::B16)
 						raw_access_16bit = true;
 					else if (width == RawWidth::B64)
 						raw_access_64bit = true;
 					aliased_access.raw_declarations.push_back({ type, width, vecsize });
-
-					aliased_access.primary_component_type = raw_width_to_component_type(type, width);
-					aliased_access.primary_raw_vecsize = vecsize;
 				}
+			}
+
+			if (descriptor_type == VulkanDescriptorType::SSBO)
+			{
+				for (int pass = 0; pass < (fold_16bit ? 2 : 1); pass++)
+				{
+					const auto &src_counts = pass == 0 ? counts : counts_16bit;
+					for (unsigned vecsize : src_counts)
+					{
+						if (vecsize <= 4)
+							continue;
+
+						bool duplicate = false;
+						for (const auto &decl : aliased_access.raw_declarations)
+						{
+							if (decl.type == type && decl.width == width && decl.vecsize == vecsize)
+							{
+								duplicate = true;
+								break;
+							}
+						}
+
+						if (!duplicate)
+						{
+							aliased_access.raw_declarations.push_back({ type, width, vecsize });
+							max_vecsize = std::max(max_vecsize, vecsize);
+						}
+					}
+				}
+			}
+
+			if (max_vecsize)
+			{
+				aliased_access.primary_component_type = raw_width_to_component_type(type, width);
+				aliased_access.primary_raw_vecsize = max_vecsize;
 			}
 		}
 	}
