@@ -1,0 +1,16 @@
+struct Elem
+{
+	vector<float, 7> value;
+	float pad[1];
+};
+
+StructuredBuffer<Elem> Input : register(t0);
+RWStructuredBuffer<Elem> Output : register(u0);
+
+[numthreads(1, 1, 1)]
+void main(uint index : SV_DispatchThreadID)
+{
+	Elem e = Input[index];
+	e.value += 1;
+	Output[index] = e;
+}
